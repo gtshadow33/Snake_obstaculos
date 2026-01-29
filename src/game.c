@@ -17,7 +17,7 @@ int score = 0;
 Direction dir = RIGHT;
 
 /* Helper function: returns 1 if position is free, 0 if occupied */
-int is_position_free(int x, int y, int ignore_food) {
+int is_position_free(int x, int y) {
     // Check snake
     for (int i = 0; i < length; i++)
         if (snake[i].x == x && snake[i].y == y) return 0;
@@ -46,7 +46,7 @@ void spawn_obstacle() {
         y = rand() % (HEIGHT - 2) + 1;
         attempts++;
         if (attempts > 50) return; // Evita bucle infinito
-    } while (!is_position_free(x, y, 0));
+    } while (!is_position_free(x, y));
 
     obstacles[obstacle_count].x = x;
     obstacles[obstacle_count].y = y;
