@@ -8,7 +8,7 @@ int main() {
         input();
         logic();
         draw();
-        usleep(1);
+        usleep(120000);
     }
 
     endwin();

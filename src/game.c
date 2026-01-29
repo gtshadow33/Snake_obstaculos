@@ -84,16 +84,22 @@ void input() {
 }
 
 void logic() {
+    // Manejo de obstáculos cada 10 segundos
     time_t now = time(NULL);
     if (difftime(now, last_obstacle_time) >= 10) {
         spawn_obstacle();
         last_obstacle_time = now;
     }
 
+    // Guardar la cola antes de mover
+    Segment last_tail = snake[length - 1];
+
+    // Mover el cuerpo
     for (int i = length - 1; i > 0; i--) {
         snake[i] = snake[i - 1];
     }
 
+    // Mover la cabeza
     switch (dir) {
         case UP:    snake[0].y--; break;
         case DOWN:  snake[0].y++; break;
@@ -101,6 +107,7 @@ void logic() {
         case RIGHT: snake[0].x++; break;
     }
 
+    // Colisión con bordes
     if (snake[0].x <= 0 || snake[0].x >= WIDTH ||
         snake[0].y <= 0 || snake[0].y >= HEIGHT) {
         endwin();
@@ -108,6 +115,7 @@ void logic() {
         exit(0);
     }
 
+    // Colisión con sí misma
     for (int i = 1; i < length; i++) {
         if (snake[0].x == snake[i].x &&
             snake[0].y == snake[i].y) {
@@ -117,19 +125,23 @@ void logic() {
         }
     }
 
+    // Colisión con obstáculos
     for (int i = 0; i < obstacle_count; i++) {
         if (snake[0].x == obstacles[i].x &&
             snake[0].y == obstacles[i].y) {
             endwin();
-            printf("Game Over! Chocaste con un obstáculo   Score: %d\n", score);
+            printf("Game Over! Chocaste con un obstáculo. Score: %d\n", score);
             exit(0);
         }
     }
 
+    // Comer comida
     if (snake[0].x == foodX && snake[0].y == foodY) {
+        snake[length] = last_tail; // Agregar nuevo segmento al final
         length++;
         score += 10;
 
+        // Generar nueva comida en posición libre
         do {
             foodX = rand() % (WIDTH - 2) + 1;
             foodY = rand() % (HEIGHT - 2) + 1;
