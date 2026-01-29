@@ -30,7 +30,7 @@ int is_position_free(int x, int y, int ignore_food) {
     if (x <= 0 || x >= WIDTH || y <= 0 || y >= HEIGHT) return 0;
 
     // Check food only if not ignored
-    if (!ignore_food && foodX == x && foodY == y) return 0;
+    if (foodX == x && foodY == y) return 0;
 
     return 1;
 }
@@ -61,7 +61,7 @@ void spawn_food() {
         newY = rand() % (HEIGHT - 2) + 1;
         attempts++;
         if (attempts > 100) return; // Evita bucle infinito
-    } while (!is_position_free(newX, newY, 1)); // Ignora comida actual
+    } while (!is_position_free(newX, newY)); 
     foodX = newX;
     foodY = newY;
 }
