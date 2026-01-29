@@ -7,7 +7,7 @@
 #define WIDTH 40
 #define HEIGHT 20
 #define MAX_LEN 100
-#define MAX_OBS 50
+#define MAX_OBS 20
 
 typedef struct {
     int x;
@@ -31,7 +31,6 @@ extern int foodX, foodY;
 /* Obstacles */
 extern Obstacle obstacles[MAX_OBS];
 extern int obstacle_count;
-extern time_t last_obstacle_time;
 
 /* Game state */
 extern int score;
