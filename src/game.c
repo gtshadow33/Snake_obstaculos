@@ -1,8 +1,6 @@
 #include "../include/game.h"
 #include <stdlib.h>
 #include <stdio.h>
-#include <time.h>
-#include <ncurses.h>  // Asegúrate de incluir ncurses
 
 /* Globals */
 Segment snake[MAX_LEN];
@@ -13,60 +11,91 @@ int foodX, foodY;
 Obstacle obstacles[MAX_OBS];
 int obstacle_count = 0;
 
+Arrow arrows[MAX_ARROWS];
+
 int score = 0;
 Direction dir = RIGHT;
 
-/* Helper function: returns 1 if position is free, 0 if occupied */
+/* Helpers */
 int is_position_free(int x, int y) {
-    // Check snake
     for (int i = 0; i < length; i++)
         if (snake[i].x == x && snake[i].y == y) return 0;
 
-    // Check obstacles
     for (int i = 0; i < obstacle_count; i++)
         if (obstacles[i].x == x && obstacles[i].y == y) return 0;
 
-    // Check borders
     if (x <= 0 || x >= WIDTH || y <= 0 || y >= HEIGHT) return 0;
-
-    // Check food only if not ignored
     if (foodX == x && foodY == y) return 0;
 
     return 1;
 }
 
-/* Spawn a new obstacle */
-void spawn_obstacle() {
-    if (obstacle_count >= MAX_OBS) return;
-
-    int x, y, attempts = 0;
-
+void spawn_food() {
+    int x, y;
     do {
         x = rand() % (WIDTH - 2) + 1;
         y = rand() % (HEIGHT - 2) + 1;
-        attempts++;
-        if (attempts > 50) return; // Evita bucle infinito
     } while (!is_position_free(x, y));
 
-    obstacles[obstacle_count].x = x;
-    obstacles[obstacle_count].y = y;
-    obstacle_count++;
+    foodX = x;
+    foodY = y;
 }
 
-/* Spawn new food */
-void spawn_food() {
-    int newX, newY, attempts = 0;
+void spawn_obstacle() {
+    if (obstacle_count >= MAX_OBS) return;
+
+    int x, y;
     do {
-        newX = rand() % (WIDTH - 2) + 1;
-        newY = rand() % (HEIGHT - 2) + 1;
-        attempts++;
-        if (attempts > 100) return; // Evita bucle infinito
-    } while (!is_position_free(newX, newY)); 
-    foodX = newX;
-    foodY = newY;
+        x = rand() % (WIDTH - 2) + 1;
+        y = rand() % (HEIGHT - 2) + 1;
+    } while (!is_position_free(x, y));
+
+    obstacles[obstacle_count++] = (Obstacle){x, y};
 }
 
-/* Initialize game */
+/* Flechas */
+void spawn_arrow() {
+    for (int i = 0; i < MAX_ARROWS; i++) {
+        if (!arrows[i].active) {
+            arrows[i].active = 1;
+            int side = rand() % 4;
+
+            switch (side) {
+                case 0: arrows[i].x = rand() % (WIDTH - 2) + 1; arrows[i].y = 1; arrows[i].dir = DOWN; break;
+                case 1: arrows[i].x = rand() % (WIDTH - 2) + 1; arrows[i].y = HEIGHT - 1; arrows[i].dir = UP; break;
+                case 2: arrows[i].x = 1; arrows[i].y = rand() % (HEIGHT - 2) + 1; arrows[i].dir = RIGHT; break;
+                case 3: arrows[i].x = WIDTH - 1; arrows[i].y = rand() % (HEIGHT - 2) + 1; arrows[i].dir = LEFT; break;
+            }
+            break;
+        }
+    }
+}
+
+void move_arrows() {
+    for (int i = 0; i < MAX_ARROWS; i++) {
+        if (!arrows[i].active) continue;
+
+        switch (arrows[i].dir) {
+            case UP: arrows[i].y--; break;
+            case DOWN: arrows[i].y++; break;
+            case LEFT: arrows[i].x--; break;
+            case RIGHT: arrows[i].x++; break;
+        }
+
+        if (arrows[i].x <= 0 || arrows[i].x >= WIDTH ||
+            arrows[i].y <= 0 || arrows[i].y >= HEIGHT) {
+            arrows[i].active = 0;
+        }
+
+        if (arrows[i].x == snake[0].x && arrows[i].y == snake[0].y) {
+            endwin();
+            printf("Game Over! Hit by arrow ☠  Score: %d\n", score);
+            exit(0);
+        }
+    }
+}
+
+/* Init */
 void init_game() {
     initscr();
     noecho();
@@ -76,45 +105,39 @@ void init_game() {
 
     srand(time(NULL));
 
-    // Initialize snake
     for (int i = 0; i < length; i++) {
         snake[i].x = WIDTH / 2 - i;
         snake[i].y = HEIGHT / 2;
     }
 
-    // Initialize food
     spawn_food();
 
-    // Spawn first obstacles
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 3; i++)
         spawn_obstacle();
-    }
 }
 
-/* Handle input */
+/* Input */
 void input() {
     int ch = getch();
-
     switch (ch) {
-        case KEY_UP: case 'w': case 'W': if (dir != DOWN) dir = UP; break;
-        case KEY_DOWN: case 's': case 'S': if (dir != UP) dir = DOWN; break;
-        case KEY_LEFT: case 'a': case 'A': if (dir != RIGHT) dir = LEFT; break;
-        case KEY_RIGHT: case 'd': case 'D': if (dir != LEFT) dir = RIGHT; break;
-        case 'q': case 'Q': endwin(); exit(0);
+        case KEY_UP: case 'w': if (dir != DOWN) dir = UP; break;
+        case KEY_DOWN: case 's': if (dir != UP) dir = DOWN; break;
+        case KEY_LEFT: case 'a': if (dir != RIGHT) dir = LEFT; break;
+        case KEY_RIGHT: case 'd': if (dir != LEFT) dir = RIGHT; break;
+        case 'q': endwin(); exit(0);
     }
 }
 
-/* Game logic */
+/* Logic */
 void logic() {
-    // Occasionally spawn obstacle
-    if (rand() % 100 < 3 && obstacle_count < MAX_OBS)
-        spawn_obstacle();
+    if (rand() % 100 < 5) spawn_arrow();
+    if (rand() % 100 < 3) spawn_obstacle();
 
-    // Move snake body
+    move_arrows();
+
     for (int i = length - 1; i > 0; i--)
         snake[i] = snake[i - 1];
 
-    // Move head
     switch (dir) {
         case UP: snake[0].y--; break;
         case DOWN: snake[0].y++; break;
@@ -122,35 +145,30 @@ void logic() {
         case RIGHT: snake[0].x++; break;
     }
 
-    // Check collisions
-    // Border collision
     if (snake[0].x <= 0 || snake[0].x >= WIDTH ||
         snake[0].y <= 0 || snake[0].y >= HEIGHT) {
         endwin();
-        printf("Game Over! Hit the wall. Score: %d\n", score);
+        printf("Game Over! Wall hit. Score: %d\n", score);
         exit(0);
     }
 
-    // Self collision
     for (int i = 1; i < length; i++)
         if (snake[0].x == snake[i].x && snake[0].y == snake[i].y) {
             endwin();
-            printf("Game Over! Ate yourself. Score: %d\n", score);
+            printf("Game Over! Self hit. Score: %d\n", score);
             exit(0);
         }
 
-    // Obstacle collision
     for (int i = 0; i < obstacle_count; i++)
         if (snake[0].x == obstacles[i].x && snake[0].y == obstacles[i].y) {
             endwin();
-            printf("Game Over! Hit an obstacle. Score: %d\n", score);
+            printf("Game Over! Obstacle. Score: %d\n", score);
             exit(0);
         }
 
-    // Food collision
     if (snake[0].x == foodX && snake[0].y == foodY) {
         length++;
         score += 10;
-        spawn_food(); // nueva comida segura
+        spawn_food();
     }
 }
