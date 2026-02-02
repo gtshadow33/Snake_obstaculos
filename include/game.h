@@ -3,24 +3,23 @@
 
 #include <ncurses.h>
 #include <time.h>
+#include <pthread.h>
 
 #define WIDTH 40
 #define HEIGHT 20
 #define MAX_LEN 100
 #define MAX_OBS 20
-#define MAX_ARROWS 30
+#define MAX_ARROWS 10
+
+typedef enum { UP, DOWN, LEFT, RIGHT } Direction;
 
 typedef struct {
-    int x;
-    int y;
+    int x, y;
 } Segment;
 
 typedef struct {
-    int x;
-    int y;
+    int x, y;
 } Obstacle;
-
-typedef enum { UP, DOWN, LEFT, RIGHT } Direction;
 
 typedef struct {
     int x, y;
@@ -28,28 +27,33 @@ typedef struct {
     int active;
 } Arrow;
 
-/* Snake */
+/* Globales */
 extern Segment snake[MAX_LEN];
 extern int length;
-
-/* Food */
 extern int foodX, foodY;
-
-/* Obstacles */
 extern Obstacle obstacles[MAX_OBS];
 extern int obstacle_count;
-
-/* Arrows */
 extern Arrow arrows[MAX_ARROWS];
-
-/* Game state */
 extern int score;
 extern Direction dir;
+extern int game_running;
 
-/* Functions */
+/* Mutex para sincronización */
+extern pthread_mutex_t game_mutex;
+
+/* Funciones */
 void init_game();
 void input();
 void logic();
 void draw();
+void spawn_food();
+void spawn_obstacle();
+void spawn_arrow();
+void move_arrows();
+
+/* Funciones de hilos */
+void* input_thread(void* arg);
+void* arrow_thread(void* arg);
+void* obstacle_thread(void* arg);
 
 #endif

@@ -1,6 +1,8 @@
 #include "../include/game.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <pthread.h>
+#include <unistd.h>
 
 /* Globals */
 Segment snake[MAX_LEN];
@@ -16,6 +18,12 @@ Arrow arrows[MAX_ARROWS];
 int score = 0;
 Direction dir = RIGHT;
 
+/* Control del juego */
+int game_running = 1;
+
+/* Mutex para proteger datos compartidos */
+pthread_mutex_t game_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 /* Helpers */
 int is_position_free(int x, int y) {
     for (int i = 0; i < length; i++)
@@ -30,6 +38,16 @@ int is_position_free(int x, int y) {
     return 1;
 }
 
+void game_over(const char* message) {
+    pthread_mutex_lock(&game_mutex);
+    game_running = 0;
+    pthread_mutex_unlock(&game_mutex);
+    
+    endwin();
+    printf("%s Score: %d\n", message, score);
+    exit(0);
+}
+
 void spawn_food() {
     int x, y;
     do {
@@ -37,12 +55,18 @@ void spawn_food() {
         y = rand() % (HEIGHT - 2) + 1;
     } while (!is_position_free(x, y));
 
+    pthread_mutex_lock(&game_mutex);
     foodX = x;
     foodY = y;
+    pthread_mutex_unlock(&game_mutex);
 }
 
 void spawn_obstacle() {
-    if (obstacle_count >= MAX_OBS) return;
+    pthread_mutex_lock(&game_mutex);
+    if (obstacle_count >= MAX_OBS) {
+        pthread_mutex_unlock(&game_mutex);
+        return;
+    }
 
     int x, y;
     do {
@@ -51,10 +75,12 @@ void spawn_obstacle() {
     } while (!is_position_free(x, y));
 
     obstacles[obstacle_count++] = (Obstacle){x, y};
+    pthread_mutex_unlock(&game_mutex);
 }
 
 /* Flechas */
 void spawn_arrow() {
+    pthread_mutex_lock(&game_mutex);
     for (int i = 0; i < MAX_ARROWS; i++) {
         if (!arrows[i].active) {
             arrows[i].active = 1;
@@ -69,9 +95,11 @@ void spawn_arrow() {
             break;
         }
     }
+    pthread_mutex_unlock(&game_mutex);
 }
 
 void move_arrows() {
+    pthread_mutex_lock(&game_mutex);
     for (int i = 0; i < MAX_ARROWS; i++) {
         if (!arrows[i].active) continue;
 
@@ -88,11 +116,11 @@ void move_arrows() {
         }
 
         if (arrows[i].x == snake[0].x && arrows[i].y == snake[0].y) {
-            endwin();
-            printf("Game Over! Hit by arrow ☠  Score: %d\n", score);
-            exit(0);
+            pthread_mutex_unlock(&game_mutex);
+            game_over("Game Over! Hit by arrow ☠ ");
         }
     }
+    pthread_mutex_unlock(&game_mutex);
 }
 
 /* Init */
@@ -114,30 +142,81 @@ void init_game() {
 
     for (int i = 0; i < 3; i++)
         spawn_obstacle();
-}
-
-/* Input */
-void input() {
-    int ch = getch();
-    switch (ch) {
-        case KEY_UP: case 'w': if (dir != DOWN) dir = UP; break;
-        case KEY_DOWN: case 's': if (dir != UP) dir = DOWN; break;
-        case KEY_LEFT: case 'a': if (dir != RIGHT) dir = LEFT; break;
-        case KEY_RIGHT: case 'd': if (dir != LEFT) dir = RIGHT; break;
-        case 'q': endwin(); exit(0);
+    
+    // Inicializar todas las flechas como inactivas
+    for (int i = 0; i < MAX_ARROWS; i++) {
+        arrows[i].active = 0;
     }
 }
 
-/* Logic */
+/* HILO 1: Input (captura de teclas) */
+void* input_thread(void* arg) {
+    while (game_running) {
+        int ch = getch();
+        
+        pthread_mutex_lock(&game_mutex);
+        switch (ch) {
+            case KEY_UP: case 'w': 
+                if (dir != DOWN) dir = UP; 
+                break;
+            case KEY_DOWN: case 's': 
+                if (dir != UP) dir = DOWN; 
+                break;
+            case KEY_LEFT: case 'a': 
+                if (dir != RIGHT) dir = LEFT; 
+                break;
+            case KEY_RIGHT: case 'd': 
+                if (dir != LEFT) dir = RIGHT; 
+                break;
+            case 'q': 
+                game_running = 0;
+                pthread_mutex_unlock(&game_mutex);
+                endwin(); 
+                exit(0);
+        }
+        pthread_mutex_unlock(&game_mutex);
+        
+        usleep(10000); // 10ms
+    }
+    return NULL;
+}
+
+/* HILO 2: Movimiento de flechas */
+void* arrow_thread(void* arg) {
+    while (game_running) {
+        // Generar flechas aleatoriamente
+        if (rand() % 100 < 5) {
+            spawn_arrow();
+        }
+        
+        // Mover flechas existentes
+        move_arrows();
+        
+        usleep(100000); // 100ms (las flechas se mueven cada 100ms)
+    }
+    return NULL;
+}
+
+/* HILO 3: Generación de obstáculos */
+void* obstacle_thread(void* arg) {
+    while (game_running) {
+        if (rand() % 100 < 3) {
+            spawn_obstacle();
+        }
+        usleep(200000); // 200ms
+    }
+    return NULL;
+}
+
+/* Logic (movimiento de la serpiente) */
 void logic() {
-    if (rand() % 100 < 5) spawn_arrow();
-    if (rand() % 100 < 3) spawn_obstacle();
-
-    move_arrows();
-
+    pthread_mutex_lock(&game_mutex);
+    
+    // Mover cuerpo
     for (int i = length - 1; i > 0; i--)
         snake[i] = snake[i - 1];
 
+    // Mover cabeza
     switch (dir) {
         case UP: snake[0].y--; break;
         case DOWN: snake[0].y++; break;
@@ -145,30 +224,33 @@ void logic() {
         case RIGHT: snake[0].x++; break;
     }
 
+    // Colisión con paredes
     if (snake[0].x <= 0 || snake[0].x >= WIDTH ||
         snake[0].y <= 0 || snake[0].y >= HEIGHT) {
-        endwin();
-        printf("Game Over! Wall hit. Score: %d\n", score);
-        exit(0);
+        pthread_mutex_unlock(&game_mutex);
+        game_over("Game Over! Wall hit.");
     }
 
+    // Colisión consigo misma
     for (int i = 1; i < length; i++)
         if (snake[0].x == snake[i].x && snake[0].y == snake[i].y) {
-            endwin();
-            printf("Game Over! Self hit. Score: %d\n", score);
-            exit(0);
+            pthread_mutex_unlock(&game_mutex);
+            game_over("Game Over! Self hit.");
         }
 
+    // Colisión con obstáculos
     for (int i = 0; i < obstacle_count; i++)
         if (snake[0].x == obstacles[i].x && snake[0].y == obstacles[i].y) {
-            endwin();
-            printf("Game Over! Obstacle. Score: %d\n", score);
-            exit(0);
+            pthread_mutex_unlock(&game_mutex);
+            game_over("Game Over! Obstacle.");
         }
 
+    // Comer comida
     if (snake[0].x == foodX && snake[0].y == foodY) {
         length++;
         score += 10;
         spawn_food();
     }
+    
+    pthread_mutex_unlock(&game_mutex);
 }
