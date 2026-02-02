@@ -48,16 +48,22 @@ void game_over(const char* message) {
     exit(0);
 }
 
-void spawn_food() {
+// Versión interna sin mutex (para llamar cuando ya tienes el lock)
+void spawn_food_internal() {
     int x, y;
     do {
         x = rand() % (WIDTH - 2) + 1;
         y = rand() % (HEIGHT - 2) + 1;
     } while (!is_position_free(x, y));
 
-    pthread_mutex_lock(&game_mutex);
     foodX = x;
     foodY = y;
+}
+
+// Versión pública con mutex (para llamar desde otros hilos)
+void spawn_food() {
+    pthread_mutex_lock(&game_mutex);
+    spawn_food_internal();
     pthread_mutex_unlock(&game_mutex);
 }
 
@@ -249,7 +255,7 @@ void logic() {
     if (snake[0].x == foodX && snake[0].y == foodY) {
         length++;
         score += 10;
-        spawn_food();
+        spawn_food_internal();  // Usar versión interna (sin mutex)
     }
     
     pthread_mutex_unlock(&game_mutex);
