@@ -24,6 +24,9 @@ int game_running = 1;
 /* Mutex para proteger datos compartidos */
 pthread_mutex_t game_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+/* Variable para mensaje de game over */
+char game_over_message[100] = "";
+
 /* Helpers */
 int is_position_free(int x, int y) {
     for (int i = 0; i < length; i++)
@@ -38,14 +41,12 @@ int is_position_free(int x, int y) {
     return 1;
 }
 
+/* ✅ SOLUCIÓN: No llama endwin() ni printf() directamente */
 void game_over(const char* message) {
     pthread_mutex_lock(&game_mutex);
     game_running = 0;
+    snprintf(game_over_message, sizeof(game_over_message), "%s", message);
     pthread_mutex_unlock(&game_mutex);
-    
-    endwin();
-    printf("%s Score: %d\n", message, score);
-    exit(0);
 }
 
 // Versión interna sin mutex (para llamar cuando ya tienes el lock)
@@ -121,9 +122,11 @@ void move_arrows() {
             arrows[i].active = 0;
         }
 
+        /* ✅ ARREGLADO: No llama endwin/printf, solo marca game_running */
         if (arrows[i].x == snake[0].x && arrows[i].y == snake[0].y) {
-            pthread_mutex_unlock(&game_mutex);
-            game_over("Game Over! Hit by arrow ☠ ");
+            game_running = 0;
+            snprintf(game_over_message, sizeof(game_over_message), 
+                     "Game Over! Hit by arrow ☠  Score: %d", score);
         }
     }
     pthread_mutex_unlock(&game_mutex);
@@ -176,9 +179,10 @@ void* input_thread(void* arg) {
                 break;
             case 'q': 
                 game_running = 0;
+                snprintf(game_over_message, sizeof(game_over_message), 
+                         "Game quit. Score: %d", score);
                 pthread_mutex_unlock(&game_mutex);
-                endwin(); 
-                exit(0);
+                return NULL;
         }
         pthread_mutex_unlock(&game_mutex);
         
@@ -198,7 +202,7 @@ void* arrow_thread(void* arg) {
         // Mover flechas existentes
         move_arrows();
         
-        usleep(100000); // 100ms (las flechas se mueven cada 100ms)
+        usleep(100000); // 100ms
     }
     return NULL;
 }
@@ -233,29 +237,40 @@ void logic() {
     // Colisión con paredes
     if (snake[0].x <= 0 || snake[0].x >= WIDTH ||
         snake[0].y <= 0 || snake[0].y >= HEIGHT) {
+        game_running = 0;
+        snprintf(game_over_message, sizeof(game_over_message), 
+                 "Game Over! Wall hit. Score: %d", score);
         pthread_mutex_unlock(&game_mutex);
-        game_over("Game Over! Wall hit.");
+        return;
     }
 
     // Colisión consigo misma
-    for (int i = 1; i < length; i++)
+    for (int i = 1; i < length; i++) {
         if (snake[0].x == snake[i].x && snake[0].y == snake[i].y) {
+            game_running = 0;
+            snprintf(game_over_message, sizeof(game_over_message), 
+                     "Game Over! Self hit. Score: %d", score);
             pthread_mutex_unlock(&game_mutex);
-            game_over("Game Over! Self hit.");
+            return;
         }
+    }
 
     // Colisión con obstáculos
-    for (int i = 0; i < obstacle_count; i++)
+    for (int i = 0; i < obstacle_count; i++) {
         if (snake[0].x == obstacles[i].x && snake[0].y == obstacles[i].y) {
+            game_running = 0;
+            snprintf(game_over_message, sizeof(game_over_message), 
+                     "Game Over! Obstacle. Score: %d", score);
             pthread_mutex_unlock(&game_mutex);
-            game_over("Game Over! Obstacle.");
+            return;
         }
+    }
 
     // Comer comida
     if (snake[0].x == foodX && snake[0].y == foodY) {
         length++;
         score += 10;
-        spawn_food_internal();  // Usar versión interna (sin mutex)
+        spawn_food_internal();  // Usa versión interna (sin mutex)
     }
     
     pthread_mutex_unlock(&game_mutex);

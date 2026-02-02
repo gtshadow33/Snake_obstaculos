@@ -1,6 +1,7 @@
 #include "../include/game.h"
 
 void draw() {
+  
     pthread_mutex_lock(&game_mutex);
     
     //  CAMBIO 1: erase() en lugar de clear()
@@ -39,7 +40,12 @@ void draw() {
     mvprintw(HEIGHT + 1, 0, "Score: %d | Length: %d", score, length);
     mvprintw(HEIGHT + 2, 0, "WASD / Arrows | Q quit");
     
-    //  CAMBIO 3: refresh() al final (ya lo tenías bien)
+
+
+
+ 
+
+        //  CAMBIO 3: refresh() al final (ya lo tenías bien)
     refresh();
     
     pthread_mutex_unlock(&game_mutex);

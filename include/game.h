@@ -38,6 +38,9 @@ extern int score;
 extern Direction dir;
 extern int game_running;
 
+/* Mensaje de game over */
+extern char game_over_message[100];
+
 /* Mutex para sincronización */
 extern pthread_mutex_t game_mutex;
 
@@ -47,9 +50,11 @@ void input();
 void logic();
 void draw();
 void spawn_food();
+void spawn_food_internal();  // Versión sin mutex
 void spawn_obstacle();
 void spawn_arrow();
 void move_arrows();
+void game_over(const char* message);
 
 /* Funciones de hilos */
 void* input_thread(void* arg);
