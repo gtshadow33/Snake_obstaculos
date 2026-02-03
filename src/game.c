@@ -41,7 +41,7 @@ int is_position_free(int x, int y) {
     return 1;
 }
 
-/* ✅ SOLUCIÓN: No llama endwin() ni printf() directamente */
+/*  SOLUCIÓN: No llama endwin() ni printf() directamente */
 void game_over(const char* message) {
     pthread_mutex_lock(&game_mutex);
     game_running = 0;
@@ -122,7 +122,7 @@ void move_arrows() {
             arrows[i].active = 0;
         }
 
-        /* ✅ ARREGLADO: No llama endwin/printf, solo marca game_running */
+        /*  ARREGLADO: No llama endwin/printf, solo marca game_running */
         if (arrows[i].x == snake[0].x && arrows[i].y == snake[0].y) {
             game_running = 0;
             snprintf(game_over_message, sizeof(game_over_message), 
