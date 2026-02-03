@@ -2,7 +2,7 @@
 
 Un juego de Snake clásico implementado en C con **arquitectura multihilo** y renderizado en tiempo real usando ncurses. El juego demuestra conceptos avanzados de programación concurrente, sincronización con mutex y gestión de recursos en C.
 
-## 🎮 Características
+##  Características
 
 - **Serpiente controlable** con WASD o flechas del teclado
 - **Comida (O)** que aparece aleatoriamente en el tablero
