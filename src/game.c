@@ -67,7 +67,6 @@ void spawn_food() {
     spawn_food_internal();
     pthread_mutex_unlock(&game_mutex);
 }
-
 void spawn_obstacle() {
     pthread_mutex_lock(&game_mutex);
     if (obstacle_count >= MAX_OBS) {
@@ -79,12 +78,23 @@ void spawn_obstacle() {
     do {
         x = rand() % (WIDTH - 2) + 1;
         y = rand() % (HEIGHT - 2) + 1;
-    } while (!is_position_free(x, y));
+    } while (!is_position_free(x, y) || !space_obstacles(x, y)); // <-- Aquí estaba el error
 
     obstacles[obstacle_count++] = (Obstacle){x, y};
     pthread_mutex_unlock(&game_mutex);
 }
 
+
+int space_obstacles(int x, int y) {
+    // Suponiendo que es el tamaño de tu arreglo
+    for (int i = 0; i < obstacle_count; i++) {
+        // Comprueba si (x, y) está en el mismo lugar o en los 8 cuadros adyacentes
+        if (abs(obstacles[i].x - x) <= 1 && abs(obstacles[i].y - y) <= 1) {
+            return 0; // Hay un obstáculo o está demasiado cerca
+        }
+    }
+    return 1; // El espacio está libre y tiene margen
+}
 /* Flechas */
 void spawn_arrow() {
     pthread_mutex_lock(&game_mutex);
@@ -275,3 +285,4 @@ void logic() {
     
     pthread_mutex_unlock(&game_mutex);
 }
+
